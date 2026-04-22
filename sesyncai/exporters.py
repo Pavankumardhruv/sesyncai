@@ -3,11 +3,42 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Optional
 
 from .model import ProjectContext
+from .instructions import InstructionStore
 
 
-def to_claude_md(ctx: ProjectContext) -> str:
+def _instruction_section_md(store: Optional[InstructionStore]) -> list[str]:
+    if not store or not store.instructions:
+        return []
+
+    lines = ["## Instructions", ""]
+    grouped = store.by_category()
+
+    category_labels = {
+        "constraint": "Constraints",
+        "convention": "Conventions",
+        "architecture": "Architecture",
+        "style": "Code Style",
+        "preference": "Preferences",
+        "decision": "Decisions",
+        "workflow": "Workflow",
+    }
+
+    for cat in ("constraint", "architecture", "convention", "style", "preference", "decision", "workflow"):
+        items = grouped.get(cat, [])
+        if not items:
+            continue
+        lines.append(f"### {category_labels.get(cat, cat.title())}")
+        for inst in items:
+            lines.append(f"- {inst.text}")
+        lines.append("")
+
+    return lines
+
+
+def to_claude_md(ctx: ProjectContext, store: Optional[InstructionStore] = None) -> str:
     lines = [f"# {ctx.name}", ""]
 
     if ctx.description:
@@ -45,8 +76,10 @@ def to_claude_md(ctx: ProjectContext) -> str:
         lines.append("```")
         lines.append("")
 
+    lines.extend(_instruction_section_md(store))
+
     if ctx.conventions:
-        lines.append("## Conventions")
+        lines.append("## Auto-detected Conventions")
         for c in ctx.conventions:
             lines.append(f"- {c}")
         lines.append("")
@@ -60,7 +93,7 @@ def to_claude_md(ctx: ProjectContext) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def to_cursorrules(ctx: ProjectContext) -> str:
+def to_cursorrules(ctx: ProjectContext, store: Optional[InstructionStore] = None) -> str:
     lines = []
 
     if ctx.description:
@@ -84,8 +117,15 @@ def to_cursorrules(ctx: ProjectContext) -> str:
         lines.append("Key dependencies: " + ", ".join(d.name for d in ctx.dependencies[:15]))
         lines.append("")
 
+    if store and store.instructions:
+        grouped = store.by_category()
+        for cat in ("constraint", "architecture", "convention", "style", "preference", "decision", "workflow"):
+            items = grouped.get(cat, [])
+            for inst in items:
+                lines.append(f"- {inst.text}")
+        lines.append("")
+
     if ctx.conventions:
-        lines.append("Conventions:")
         for c in ctx.conventions:
             lines.append(f"- {c}")
         lines.append("")
@@ -98,7 +138,7 @@ def to_cursorrules(ctx: ProjectContext) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
-def to_system_prompt(ctx: ProjectContext) -> str:
+def to_system_prompt(ctx: ProjectContext, store: Optional[InstructionStore] = None) -> str:
     parts = [f"You are working on {ctx.name}."]
 
     if ctx.description:
@@ -124,6 +164,15 @@ def to_system_prompt(ctx: ProjectContext) -> str:
     if ctx.test_command:
         parts.append(f"Test with: {ctx.test_command}.")
 
+    if store and store.instructions:
+        grouped = store.by_category()
+        constraint_items = grouped.get("constraint", [])
+        if constraint_items:
+            parts.append("Key rules: " + "; ".join(i.text for i in constraint_items) + ".")
+        other = [i for cat, items in grouped.items() if cat != "constraint" for i in items]
+        if other:
+            parts.append("Guidelines: " + "; ".join(i.text for i in other[:10]) + ".")
+
     if ctx.conventions:
         parts.append("Conventions: " + "; ".join(ctx.conventions) + ".")
 
@@ -140,12 +189,12 @@ EXPORTERS = {
 }
 
 
-def export_context(ctx: ProjectContext, fmt: str, root: Path) -> str:
+def export_context(ctx: ProjectContext, fmt: str, root: Path, store: Optional[InstructionStore] = None) -> str:
     if fmt not in EXPORTERS:
         raise ValueError(f"Unknown format: {fmt}. Choose from: {', '.join(EXPORTERS)}")
 
     filename, formatter = EXPORTERS[fmt]
-    content = formatter(ctx)
+    content = formatter(ctx, store)
 
     if filename:
         out = root / filename

@@ -21,13 +21,20 @@ from .extractor import scan_all, merge_into_store
 app = typer.Typer(
     name="sesyncai",
     help="Capture, sync, and share your AI project context.",
-    no_args_is_help=True,
+    invoke_without_command=True,
 )
 console = Console()
 
 CTX_DIR = ".sesyncai"
 CTX_FILE = "context.yaml"
 INST_FILE = "instructions.yaml"
+
+
+@app.callback()
+def main(ctx: typer.Context):
+    """Capture, sync, and share your AI project context."""
+    if ctx.invoked_subcommand is None:
+        _interactive_flow()
 
 
 def _ctx_path(root: Path) -> Path:
@@ -331,3 +338,187 @@ def _show_extraction_summary(found: list) -> None:
         console.print("[bold]Categories:[/bold]")
         for cat, count in categories.most_common():
             console.print(f"  {cat}: {count}")
+
+
+# ── Interactive flow ─────────────────────────────────────────────────
+
+
+def _prompt_choice(prompt: str, options: list[str]) -> int:
+    for i, opt in enumerate(options, 1):
+        console.print(f"  [cyan]{i}[/cyan]  {opt}")
+    console.print()
+
+    while True:
+        try:
+            raw = console.input(f"[bold]{prompt}[/bold] ")
+            choice = int(raw.strip())
+            if 1 <= choice <= len(options):
+                return choice - 1
+        except (ValueError, EOFError):
+            pass
+        console.print(f"[dim]Enter a number 1–{len(options)}[/dim]")
+
+
+def _interactive_flow() -> None:
+    root = Path.cwd()
+
+    console.print(Panel(
+        "[bold]sesyncai[/bold] — AI context capture & sync\n\n"
+        f"Project directory: [cyan]{root}[/cyan]",
+        border_style="cyan",
+    ))
+
+    ctx_path = _ctx_path(root)
+    inst_path = _inst_path(root)
+    has_context = ctx_path.exists()
+
+    if has_context:
+        ctx = ProjectContext.load(ctx_path)
+        store = InstructionStore.load(inst_path)
+        console.print(f"[green]Context loaded[/green] — {ctx.name} ({ctx.language or 'unknown'}, {len(ctx.dependencies)} deps, {len(store.instructions)} instructions)\n")
+    else:
+        console.print("[yellow]No context yet.[/yellow] Let's set it up.\n")
+
+    while True:
+        if not has_context:
+            options = [
+                "Scan this project",
+                "Exit",
+            ]
+        else:
+            options = [
+                "Re-scan project (refresh context)",
+                "Scan for instructions in AI context files",
+                "Add an instruction manually",
+                "View captured instructions",
+                "Save as local markdown file",
+                "Export for Claude Code (CLAUDE.md)",
+                "Export for Cursor (.cursorrules)",
+                "Copy system prompt to paste anywhere",
+                "Sync to GitHub Gist",
+                "Exit",
+            ]
+
+        choice = _prompt_choice("What would you like to do?", options)
+
+        if not has_context:
+            if choice == 0:
+                with console.status("Scanning project…"):
+                    ctx = scan_project(root)
+                ctx.save(ctx_path)
+                store = InstructionStore.load(inst_path)
+                has_context = True
+                console.print(Panel(
+                    f"[bold green]Context captured[/bold green]\n\n"
+                    f"  Name:      {ctx.name}\n"
+                    f"  Language:   {ctx.language or '—'}\n"
+                    f"  Framework:  {ctx.framework or '—'}\n"
+                    f"  Deps:       {len(ctx.dependencies)}",
+                    border_style="cyan",
+                ))
+                continue
+            else:
+                break
+        else:
+            if choice == 0:
+                with console.status("Scanning project…"):
+                    ctx = scan_project(root)
+                ctx.save(ctx_path)
+                console.print("[green]Context refreshed.[/green]\n")
+                continue
+
+            elif choice == 1:
+                with console.status("Scanning AI context files…"):
+                    found = scan_all(root)
+                if not found:
+                    console.print("[yellow]No instructions found in AI context files.[/yellow]\n")
+                else:
+                    added, skipped = merge_into_store(store, found)
+                    store.save(inst_path)
+                    console.print(f"[green]Extracted {added} instructions[/green]"
+                                  + (f" [dim]({skipped} duplicates skipped)[/dim]" if skipped else "") + "\n")
+                continue
+
+            elif choice == 2:
+                try:
+                    text = console.input("[bold]Instruction:[/bold] ")
+                except EOFError:
+                    continue
+                if not text.strip():
+                    console.print("[dim]Skipped — empty input[/dim]\n")
+                    continue
+
+                cat_options = list(CATEGORIES)
+                console.print()
+                cat_idx = _prompt_choice("Category?", cat_options)
+                try:
+                    inst = store.add(text.strip(), category=cat_options[cat_idx])
+                    store.save(inst_path)
+                    console.print(f"[green]Captured[/green] [{inst.category}] {inst.text}\n")
+                except ValueError as e:
+                    console.print(f"[red]{e}[/red]\n")
+                continue
+
+            elif choice == 3:
+                if not store.instructions:
+                    console.print("[dim]No instructions captured yet.[/dim]\n")
+                else:
+                    _render_instructions_table(store)
+                    console.print()
+                continue
+
+            elif choice == 4:
+                _save_local_markdown(root, ctx, store)
+                continue
+
+            elif choice == 5:
+                result = export_context(ctx, "claude", root, store)
+                console.print(f"[green]Saved[/green] → {result}\n")
+                continue
+
+            elif choice == 6:
+                result = export_context(ctx, "cursor", root, store)
+                console.print(f"[green]Saved[/green] → {result}\n")
+                continue
+
+            elif choice == 7:
+                result = export_context(ctx, "prompt", root, store)
+                console.print(Panel(result.strip(), title="System Prompt — copy this", border_style="green"))
+                console.print()
+                continue
+
+            elif choice == 8:
+                try:
+                    with console.status("Syncing to GitHub Gist…"):
+                        gist_id = push(ctx)
+                        ctx.save(ctx_path)
+                    console.print(f"[green]Synced[/green] → https://gist.github.com/{gist_id}\n")
+                except Exception as e:
+                    console.print(f"[red]Sync failed:[/red] {e}\n")
+                continue
+
+            else:
+                break
+
+    console.print("[dim]Done.[/dim]")
+
+
+def _save_local_markdown(root: Path, ctx: ProjectContext, store: InstructionStore) -> None:
+    from .exporters import to_claude_md
+
+    default_name = f"{ctx.name}-context.md"
+    try:
+        raw = console.input(f"[bold]Filename[/bold] [dim]({default_name})[/dim]: ")
+    except EOFError:
+        raw = ""
+
+    filename = raw.strip() or default_name
+    if not filename.endswith(".md"):
+        filename += ".md"
+
+    content = to_claude_md(ctx, store)
+    out_path = root / filename
+    out_path.write_text(content, encoding="utf-8")
+
+    console.print(f"[green]Saved[/green] → {out_path}\n")
+    console.print(f"[dim]Open this file and paste it into any AI chat.[/dim]\n")

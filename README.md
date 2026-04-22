@@ -12,40 +12,50 @@ pip install sesyncai
 
 ## Quick start
 
+Just run `sesyncai` in your project directory — it walks you through everything:
+
 ```bash
-# scan your project
-sesyncai init
+cd your-project
+sesyncai
+```
 
-# see what was captured
-sesyncai show
+```text
+┌──────────────────────────────────────────────┐
+│ sesyncai — AI context capture & sync         │
+│ Project directory: /your-project             │
+└──────────────────────────────────────────────┘
 
-# export for Claude Code
-sesyncai export claude    # → CLAUDE.md
+ 1  Scan this project
+ 2  Scan for instructions in AI context files
+ 3  Add an instruction manually
+ 4  View captured instructions
+ 5  Save as local markdown file
+ 6  Export for Claude Code (CLAUDE.md)
+ 7  Export for Cursor (.cursorrules)
+ 8  Copy system prompt to paste anywhere
+ 9  Sync to GitHub Gist
+10  Exit
 
-# export for Cursor
-sesyncai export cursor    # → .cursorrules
+What would you like to do?
+```
 
-# export as a system prompt (paste into any AI)
-sesyncai export prompt
+Pick a number. No commands to memorize.
 
-# sync to GitHub Gist (requires gh auth)
-sesyncai sync
+### Direct commands
 
-# load on another machine
-sesyncai load <gist-id>
+Power users can also use individual commands:
 
-# capture instructions as you work
-sesyncai capture "Always use snake_case for API routes" -c style
-sesyncai capture "Never mock the database in tests" -c constraint
-
-# auto-extract rules from existing AI context files
-sesyncai capture --scan
-
-# view captured instructions
-sesyncai instructions
-
-# check if context drifted
-sesyncai diff
+```bash
+sesyncai init                    # scan project
+sesyncai capture --scan          # extract rules from AI context files
+sesyncai capture "your rule" -c style   # add a rule manually
+sesyncai instructions            # view captured rules
+sesyncai export claude           # → CLAUDE.md
+sesyncai export cursor           # → .cursorrules
+sesyncai export prompt           # paste-ready system prompt
+sesyncai sync                    # push to GitHub Gist
+sesyncai load <gist-id>          # pull on another machine
+sesyncai diff                    # check for context drift
 ```
 
 ## What it captures

@@ -29,16 +29,19 @@ sesyncai
 │ Project directory: /your-project             │
 └──────────────────────────────────────────────┘
 
- 1  Scan this project
+ 1  Re-scan project (refresh context)
  2  Scan for instructions in AI context files
- 3  Add an instruction manually
- 4  View captured instructions
- 5  Save as local markdown file
- 6  Export for Claude Code (CLAUDE.md)
- 7  Export for Cursor (.cursorrules)
- 8  Copy system prompt to paste anywhere
- 9  Sync to GitHub Gist
-10  Exit
+ 3  Import instructions from a markdown file
+ 4  Add an instruction manually
+ 5  View captured instructions
+ 6  Remove an instruction
+ 7  Save as local markdown file
+ 8  Export for Claude Code (CLAUDE.md)
+ 9  Export for Cursor (.cursorrules)
+10  Export for Windsurf (.windsurfrules)
+11  Copy system prompt to paste anywhere
+12  Sync to GitHub Gist
+13  Exit
 
 What would you like to do?
 ```
@@ -151,18 +154,21 @@ Requires [GitHub CLI](https://cli.github.com/) authenticated: `gh auth login`
 
 ```
 your-project/
-├── pyproject.toml          ← sesyncai reads this
-├── package.json            ← and this
-├── .git/                   ← and this
-├── CLAUDE.md               ← extracts instructions from this
-├── .cursorrules            ← and this
+├── pyproject.toml          ← sesyncai reads these for context
+├── package.json            ←   (also Cargo.toml, pubspec.yaml, go.mod)
+├── .git/                   ← git remote & branch
+├── CLAUDE.md               ← extracts instructions from these
+├── .cursorrules            ←   (also .claude/rules/, .windsurfrules,
+├── .claude/rules/          ←    copilot-instructions.md)
 └── .sesyncai/
     ├── context.yaml        ← project snapshot
     └── instructions.yaml   ← captured rules & preferences
 
-sesyncai export claude  →  CLAUDE.md (with instructions)
-sesyncai export cursor  →  .cursorrules (with instructions)
-sesyncai sync           →  GitHub Gist (private)
+sesyncai export claude    →  CLAUDE.md (with instructions)
+sesyncai export cursor    →  .cursorrules (with instructions)
+sesyncai export windsurf  →  .windsurfrules (with instructions)
+sesyncai export prompt    →  clipboard + stdout
+sesyncai sync             →  GitHub Gist (private)
 ```
 
 ## License

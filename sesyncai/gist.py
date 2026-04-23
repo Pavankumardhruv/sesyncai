@@ -63,32 +63,42 @@ def push(ctx: ProjectContext, store: Optional[InstructionStore] = None, descript
         return gist_id
 
 
+def _api_request(method: str, url: str, token: str, **kwargs) -> httpx.Response:
+    try:
+        resp = httpx.request(method, url, headers=_headers(token), timeout=30, **kwargs)
+        resp.raise_for_status()
+        return resp
+    except httpx.HTTPStatusError as e:
+        code = e.response.status_code
+        if code == 401:
+            raise RuntimeError("GitHub token expired or invalid. Run: gh auth login")
+        elif code == 404:
+            raise RuntimeError(f"Gist not found. Check the ID and permissions.")
+        elif code == 422:
+            raise RuntimeError(f"GitHub rejected the request: {e.response.text[:200]}")
+        raise RuntimeError(f"GitHub API error ({code})")
+    except httpx.ConnectError:
+        raise RuntimeError("Cannot reach GitHub. Check your internet connection.")
+    except httpx.TimeoutException:
+        raise RuntimeError("GitHub request timed out. Try again.")
+    except httpx.RequestError as e:
+        raise RuntimeError(f"Network error: {e}")
+
+
 def _create_gist(token: str, files: dict, description: str) -> str:
-    resp = httpx.post(
-        "https://api.github.com/gists",
-        headers=_headers(token),
-        json={
-            "description": description,
-            "public": False,
-            "files": files,
-        },
-        timeout=30,
-    )
-    resp.raise_for_status()
+    resp = _api_request("POST", "https://api.github.com/gists", token, json={
+        "description": description,
+        "public": False,
+        "files": files,
+    })
     return resp.json()["id"]
 
 
 def _update_gist(token: str, gist_id: str, files: dict, description: str) -> str:
-    resp = httpx.patch(
-        f"https://api.github.com/gists/{gist_id}",
-        headers=_headers(token),
-        json={
-            "description": description,
-            "files": files,
-        },
-        timeout=30,
-    )
-    resp.raise_for_status()
+    _api_request("PATCH", f"https://api.github.com/gists/{gist_id}", token, json={
+        "description": description,
+        "files": files,
+    })
     return gist_id
 
 
@@ -99,12 +109,7 @@ def pull(gist_id: str) -> tuple[ProjectContext, InstructionStore]:
             "GitHub CLI not authenticated. Run: gh auth login"
         )
 
-    resp = httpx.get(
-        f"https://api.github.com/gists/{gist_id}",
-        headers=_headers(token),
-        timeout=30,
-    )
-    resp.raise_for_status()
+    resp = _api_request("GET", f"https://api.github.com/gists/{gist_id}", token)
 
     data = resp.json()
     files = data.get("files", {})

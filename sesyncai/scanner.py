@@ -80,6 +80,10 @@ def _parse_pyproject(path: Path, ctx: ProjectContext) -> None:
             data = tomllib.loads(text)
         except ImportError:
             pass
+        except Exception:
+            pass
+    except Exception:
+        pass
 
     if data is None:
         _parse_pyproject_regex(text, ctx)

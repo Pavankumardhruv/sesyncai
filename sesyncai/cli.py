@@ -11,6 +11,7 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.table import Table
 
+from . import __version__
 from .model import ProjectContext
 from .scanner import scan_project
 from .exporters import export_context, EXPORTERS
@@ -30,8 +31,17 @@ CTX_FILE = "context.yaml"
 INST_FILE = "instructions.yaml"
 
 
+def _version_callback(value: bool):
+    if value:
+        console.print(f"sesyncai {__version__}")
+        raise typer.Exit()
+
+
 @app.callback()
-def main(ctx: typer.Context):
+def main(
+    ctx: typer.Context,
+    version: bool = typer.Option(False, "--version", "-v", callback=_version_callback, is_eager=True, help="Show version"),
+):
     """Capture, sync, and share your AI project context."""
     if ctx.invoked_subcommand is None:
         _interactive_flow()
@@ -133,23 +143,25 @@ def export(
 def sync(
     path: Optional[str] = typer.Option(None, "--path", "-p", help="Project root"),
 ):
-    """Push context to a GitHub Gist."""
+    """Push context and instructions to a GitHub Gist."""
     root = Path(path).resolve() if path else Path.cwd()
     _require_init(root)
 
     ctx = ProjectContext.load(_ctx_path(root))
+    store = InstructionStore.load(_inst_path(root))
 
     with console.status("Syncing to GitHub Gist…"):
-        gist_id = push(ctx)
+        gist_id = push(ctx, store)
         ctx.save(_ctx_path(root))
 
-    console.print(Panel(
-        f"[bold green]Synced[/bold green]\n\n"
-        f"  Gist ID:  {gist_id}\n"
-        f"  URL:      https://gist.github.com/{gist_id}",
-        title="sesyncai sync",
-        border_style="cyan",
-    ))
+    parts = [f"[bold green]Synced[/bold green]\n"]
+    parts.append(f"  Gist ID:  {gist_id}")
+    parts.append(f"  URL:      https://gist.github.com/{gist_id}")
+    parts.append(f"  Context:  {ctx.name} ({ctx.language or 'unknown'})")
+    if store.instructions:
+        parts.append(f"  Rules:    {len(store.instructions)} instructions")
+
+    console.print(Panel("\n".join(parts), title="sesyncai sync", border_style="cyan"))
 
 
 @app.command()
@@ -157,23 +169,24 @@ def load(
     gist_id: str = typer.Argument(..., help="Gist ID to pull context from"),
     path: Optional[str] = typer.Option(None, "--path", "-p", help="Project root to save into"),
 ):
-    """Pull context from a GitHub Gist."""
+    """Pull context and instructions from a GitHub Gist."""
     root = Path(path).resolve() if path else Path.cwd()
 
     with console.status("Pulling from GitHub Gist…"):
-        ctx = pull(gist_id)
+        ctx, store = pull(gist_id)
 
-    ctx_path = _ctx_path(root)
-    ctx.save(ctx_path)
+    ctx.save(_ctx_path(root))
+    if store.instructions:
+        store.save(_inst_path(root))
 
-    console.print(Panel(
-        f"[bold green]Loaded[/bold green] → {ctx_path.relative_to(root)}\n\n"
-        f"  Name:      {ctx.name}\n"
-        f"  Language:   {ctx.language or '—'}\n"
-        f"  Framework:  {ctx.framework or '—'}",
-        title="sesyncai load",
-        border_style="cyan",
-    ))
+    parts = [f"[bold green]Loaded[/bold green] → .sesyncai/\n"]
+    parts.append(f"  Name:      {ctx.name}")
+    parts.append(f"  Language:   {ctx.language or '—'}")
+    parts.append(f"  Framework:  {ctx.framework or '—'}")
+    if store.instructions:
+        parts.append(f"  Rules:     {len(store.instructions)} instructions")
+
+    console.print(Panel("\n".join(parts), title="sesyncai load", border_style="cyan"))
 
 
 @app.command()
@@ -490,9 +503,11 @@ def _interactive_flow() -> None:
             elif choice == 8:
                 try:
                     with console.status("Syncing to GitHub Gist…"):
-                        gist_id = push(ctx)
+                        gist_id = push(ctx, store)
                         ctx.save(ctx_path)
-                    console.print(f"[green]Synced[/green] → https://gist.github.com/{gist_id}\n")
+                    n = len(store.instructions)
+                    console.print(f"[green]Synced[/green] → https://gist.github.com/{gist_id}"
+                                  + (f" ({n} instructions included)" if n else "") + "\n")
                 except Exception as e:
                     console.print(f"[red]Sync failed:[/red] {e}\n")
                 continue

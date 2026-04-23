@@ -108,12 +108,41 @@ def _extract_instruction(line: str) -> Optional[str]:
     return None
 
 
+def _join_continuation_lines(raw_lines: list[str]) -> list[str]:
+    """Merge bullet-point continuation lines into single logical lines.
+
+    A continuation is any indented non-blank line that doesn't start a new
+    bullet or heading, following a bullet line.
+    """
+    merged: list[str] = []
+    for line in raw_lines:
+        stripped = line.strip()
+        if not stripped:
+            merged.append(line)
+            continue
+        is_bullet = bool(re.match(r"^\s*[-*]\s+", line))
+        is_heading = stripped.startswith("#")
+        is_fence = stripped.startswith("```")
+
+        if is_bullet or is_heading or is_fence or not merged:
+            merged.append(line)
+        else:
+            prev = merged[-1].strip()
+            if prev and re.match(r"^\s*[-*]\s+", merged[-1]):
+                merged[-1] = merged[-1].rstrip() + " " + stripped
+            else:
+                merged.append(line)
+    return merged
+
+
 def _extract_markdown(path: Path, source: str) -> list[Instruction]:
     instructions: list[Instruction] = []
     in_code_block = False
     section_context = ""
 
-    for line in path.read_text(encoding="utf-8").splitlines():
+    lines = _join_continuation_lines(path.read_text(encoding="utf-8").splitlines())
+
+    for line in lines:
         stripped = line.strip()
 
         if stripped.startswith("```"):
@@ -143,7 +172,7 @@ def _extract_cursorrules(path: Path, source: str) -> list[Instruction]:
     instructions: list[Instruction] = []
     in_code_block = False
 
-    for line in path.read_text(encoding="utf-8").splitlines():
+    for line in _join_continuation_lines(path.read_text(encoding="utf-8").splitlines()):
         stripped = line.strip()
 
         if stripped.startswith("```"):
@@ -198,7 +227,7 @@ def _extract_rule_file(path: Path, source: str) -> list[Instruction]:
     instructions: list[Instruction] = []
     in_code_block = False
 
-    for line in body.splitlines():
+    for line in _join_continuation_lines(body.splitlines()):
         stripped = line.strip()
 
         if stripped.startswith("```"):

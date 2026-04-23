@@ -1,18 +1,18 @@
-"""GitHub Gist sync — push and pull context via gists."""
+"""GitHub Gist sync — push and pull context + instructions via gists."""
 
 from __future__ import annotations
 
-import json
 import subprocess
-from pathlib import Path
 from datetime import datetime, timezone
 from typing import Optional
 
 import httpx
 
 from .model import ProjectContext
+from .instructions import InstructionStore
 
-GIST_FILENAME = "sesyncai-context.yaml"
+CONTEXT_FILENAME = "sesyncai-context.yaml"
+INSTRUCTIONS_FILENAME = "sesyncai-instructions.yaml"
 
 
 def _gh_token() -> Optional[str]:
@@ -36,7 +36,7 @@ def _headers(token: str) -> dict:
     }
 
 
-def push(ctx: ProjectContext, description: str = "") -> str:
+def push(ctx: ProjectContext, store: Optional[InstructionStore] = None, description: str = "") -> str:
     token = _gh_token()
     if not token:
         raise RuntimeError(
@@ -44,25 +44,33 @@ def push(ctx: ProjectContext, description: str = "") -> str:
         )
 
     ctx.last_synced = datetime.now(timezone.utc).isoformat()
-    content = ctx.to_yaml()
     desc = description or f"sesyncai context — {ctx.name}"
 
+    files = {CONTEXT_FILENAME: {"content": ctx.to_yaml()}}
+    if store and store.instructions:
+        import yaml
+        data = [{"text": i.text, "category": i.category, "source": i.source, "added": i.added}
+                for i in store.instructions]
+        files[INSTRUCTIONS_FILENAME] = {
+            "content": yaml.dump(data, default_flow_style=False, sort_keys=False, allow_unicode=True)
+        }
+
     if ctx.gist_id:
-        return _update_gist(token, ctx.gist_id, content, desc)
+        return _update_gist(token, ctx.gist_id, files, desc)
     else:
-        gist_id = _create_gist(token, content, desc)
+        gist_id = _create_gist(token, files, desc)
         ctx.gist_id = gist_id
         return gist_id
 
 
-def _create_gist(token: str, content: str, description: str) -> str:
+def _create_gist(token: str, files: dict, description: str) -> str:
     resp = httpx.post(
         "https://api.github.com/gists",
         headers=_headers(token),
         json={
             "description": description,
             "public": False,
-            "files": {GIST_FILENAME: {"content": content}},
+            "files": files,
         },
         timeout=30,
     )
@@ -70,13 +78,13 @@ def _create_gist(token: str, content: str, description: str) -> str:
     return resp.json()["id"]
 
 
-def _update_gist(token: str, gist_id: str, content: str, description: str) -> str:
+def _update_gist(token: str, gist_id: str, files: dict, description: str) -> str:
     resp = httpx.patch(
         f"https://api.github.com/gists/{gist_id}",
         headers=_headers(token),
         json={
             "description": description,
-            "files": {GIST_FILENAME: {"content": content}},
+            "files": files,
         },
         timeout=30,
     )
@@ -84,7 +92,7 @@ def _update_gist(token: str, gist_id: str, content: str, description: str) -> st
     return gist_id
 
 
-def pull(gist_id: str) -> ProjectContext:
+def pull(gist_id: str) -> tuple[ProjectContext, InstructionStore]:
     token = _gh_token()
     if not token:
         raise RuntimeError(
@@ -101,10 +109,18 @@ def pull(gist_id: str) -> ProjectContext:
     data = resp.json()
     files = data.get("files", {})
 
-    if GIST_FILENAME not in files:
-        raise ValueError(f"Gist {gist_id} doesn't contain {GIST_FILENAME}")
+    if CONTEXT_FILENAME not in files:
+        raise ValueError(f"Gist {gist_id} doesn't contain {CONTEXT_FILENAME}")
 
-    content = files[GIST_FILENAME]["content"]
-    ctx = ProjectContext.from_yaml(content)
+    ctx = ProjectContext.from_yaml(files[CONTEXT_FILENAME]["content"])
     ctx.gist_id = gist_id
-    return ctx
+
+    store = InstructionStore()
+    if INSTRUCTIONS_FILENAME in files:
+        import yaml
+        raw = yaml.safe_load(files[INSTRUCTIONS_FILENAME]["content"])
+        if raw and isinstance(raw, list):
+            from .instructions import Instruction
+            store.instructions = [Instruction(**item) for item in raw]
+
+    return ctx, store

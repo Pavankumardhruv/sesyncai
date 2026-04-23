@@ -72,6 +72,16 @@ def _copy_to_clipboard(text: str) -> bool:
         return False
 
 
+def _suggest_gitignore(root: Path) -> None:
+    gitignore = root / ".gitignore"
+    if not gitignore.exists():
+        return
+    content = gitignore.read_text()
+    if ".sesyncai/" in content or ".sesyncai" in content:
+        return
+    console.print("[dim]Tip: add .sesyncai/ to your .gitignore to keep context local[/dim]")
+
+
 def _require_init(root: Path) -> Path:
     ctx_path = _ctx_path(root)
     if not ctx_path.exists():
@@ -111,6 +121,8 @@ def init(
         title="sesyncai init",
         border_style="cyan",
     ))
+
+    _suggest_gitignore(root)
 
 
 @app.command()

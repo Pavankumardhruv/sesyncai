@@ -1,5 +1,9 @@
 # sesyncai
 
+[![tests](https://github.com/Pavankumardhruv/sesyncai/actions/workflows/test.yml/badge.svg)](https://github.com/Pavankumardhruv/sesyncai/actions/workflows/test.yml)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 Capture, sync, and share your AI project context across tools and machines.
 
 Stop re-explaining your project every time you switch between Claude, Cursor, ChatGPT, or move to a new machine. `sesyncai` scans your codebase once, captures your developer instructions, and generates a portable context snapshot you can export, sync, and reload anywhere.

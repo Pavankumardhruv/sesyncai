@@ -182,9 +182,14 @@ def to_system_prompt(ctx: ProjectContext, store: Optional[InstructionStore] = No
     return " ".join(parts) + "\n"
 
 
+def to_windsurf(ctx: ProjectContext, store: Optional[InstructionStore] = None) -> str:
+    return to_cursorrules(ctx, store)
+
+
 EXPORTERS = {
     "claude": ("CLAUDE.md", to_claude_md),
     "cursor": (".cursorrules", to_cursorrules),
+    "windsurf": (".windsurfrules", to_windsurf),
     "prompt": (None, to_system_prompt),
 }
 

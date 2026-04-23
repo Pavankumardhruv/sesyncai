@@ -52,13 +52,16 @@ Power users can also use individual commands:
 ```bash
 sesyncai init                    # scan project
 sesyncai capture --scan          # extract rules from AI context files
-sesyncai capture "your rule" -c style   # add a rule manually
+sesyncai capture "your rule"     # add a rule (category auto-detected)
+sesyncai import notes.md         # import rules from any markdown file
 sesyncai instructions            # view captured rules
 sesyncai export claude           # → CLAUDE.md
 sesyncai export cursor           # → .cursorrules
-sesyncai export prompt           # paste-ready system prompt
+sesyncai export windsurf         # → .windsurfrules
+sesyncai export prompt           # paste-ready system prompt (copied to clipboard)
 sesyncai sync                    # push to GitHub Gist
 sesyncai load <gist-id>          # pull on another machine
+sesyncai status                  # quick summary
 sesyncai diff                    # check for context drift
 ```
 
@@ -119,7 +122,8 @@ sesyncai instructions --clear
 |---|---|---|
 | Claude Code | `sesyncai export claude` | `CLAUDE.md` |
 | Cursor | `sesyncai export cursor` | `.cursorrules` |
-| System prompt | `sesyncai export prompt` | Printed to stdout |
+| Windsurf | `sesyncai export windsurf` | `.windsurfrules` |
+| System prompt | `sesyncai export prompt` | Copied to clipboard + stdout |
 
 ## Cloud sync
 

@@ -17,7 +17,7 @@ from .scanner import scan_project
 from .exporters import export_context, EXPORTERS
 from .gist import push, pull
 from .instructions import InstructionStore, CATEGORIES
-from .extractor import scan_all, merge_into_store
+from .extractor import scan_all, merge_into_store, _classify, _extract_markdown
 
 app = typer.Typer(
     name="sesyncai",
@@ -298,7 +298,7 @@ def diff(
 @app.command()
 def capture(
     text: Optional[str] = typer.Argument(None, help="Instruction text to capture"),
-    category: str = typer.Option("convention", "--category", "-c", help=f"Category: {', '.join(CATEGORIES)}"),
+    category: Optional[str] = typer.Option(None, "--category", "-c", help=f"Category: {', '.join(CATEGORIES)}"),
     scan: bool = typer.Option(False, "--scan", "-s", help="Auto-extract from AI context files"),
     path: Optional[str] = typer.Option(None, "--path", "-p", help="Project root"),
 ):
@@ -335,8 +335,10 @@ def capture(
         console.print("  sesyncai capture --scan")
         raise typer.Exit(1)
 
+    resolved_cat = category or _classify(text)
+
     try:
-        inst = store.add(text, category=category)
+        inst = store.add(text, category=resolved_cat)
         store.save(inst_path)
     except ValueError as e:
         console.print(f"[red]{e}[/red]")
@@ -344,6 +346,38 @@ def capture(
 
     console.print(
         f"[green]Captured[/green] [{inst.category}] {inst.text}"
+    )
+
+
+@app.command(name="import")
+def import_file(
+    file: str = typer.Argument(..., help="Markdown file to import instructions from"),
+    path: Optional[str] = typer.Option(None, "--path", "-p", help="Project root"),
+):
+    """Import instructions from any markdown file."""
+    root = Path(path).resolve() if path else Path.cwd()
+    source_path = Path(file)
+
+    if not source_path.exists():
+        console.print(f"[red]File not found:[/red] {file}")
+        raise typer.Exit(1)
+
+    inst_path = _inst_path(root)
+    store = InstructionStore.load(inst_path)
+
+    with console.status(f"Extracting from {source_path.name}…"):
+        found = _extract_markdown(source_path, source_path.name)
+
+    if not found:
+        console.print(f"[yellow]No instructions found in {source_path.name}[/yellow]")
+        return
+
+    added, skipped = merge_into_store(store, found)
+    store.save(inst_path)
+
+    console.print(
+        f"[green]Imported {added} instructions[/green] from {source_path.name}"
+        + (f" [dim]({skipped} duplicates skipped)[/dim]" if skipped else "")
     )
 
 
@@ -467,14 +501,20 @@ def _interactive_flow() -> None:
                 "Exit",
             ]
         else:
+            n_inst = len(store.instructions)
+            inst_label = f" ({n_inst})" if n_inst else ""
+
             options = [
                 "Re-scan project (refresh context)",
                 "Scan for instructions in AI context files",
+                "Import instructions from a markdown file",
                 "Add an instruction manually",
-                "View captured instructions",
+                f"View captured instructions{inst_label}",
+                "Remove an instruction",
                 "Save as local markdown file",
                 "Export for Claude Code (CLAUDE.md)",
                 "Export for Cursor (.cursorrules)",
+                "Export for Windsurf (.windsurfrules)",
                 "Copy system prompt to paste anywhere",
                 "Sync to GitHub Gist",
                 "Exit",
@@ -497,6 +537,7 @@ def _interactive_flow() -> None:
                     f"  Deps:       {len(ctx.dependencies)}",
                     border_style="cyan",
                 ))
+                _suggest_gitignore(root)
                 continue
             else:
                 break
@@ -522,6 +563,30 @@ def _interactive_flow() -> None:
 
             elif choice == 2:
                 try:
+                    filepath = console.input("[bold]Path to markdown file:[/bold] ")
+                except EOFError:
+                    continue
+                filepath = filepath.strip()
+                if not filepath:
+                    console.print("[dim]Skipped[/dim]\n")
+                    continue
+                source_path = Path(filepath).expanduser()
+                if not source_path.exists():
+                    console.print(f"[red]File not found:[/red] {filepath}\n")
+                    continue
+                with console.status(f"Extracting from {source_path.name}…"):
+                    found = _extract_markdown(source_path, source_path.name)
+                if not found:
+                    console.print(f"[yellow]No instructions found in {source_path.name}[/yellow]\n")
+                else:
+                    added, skipped = merge_into_store(store, found)
+                    store.save(inst_path)
+                    console.print(f"[green]Imported {added} instructions[/green]"
+                                  + (f" [dim]({skipped} duplicates)[/dim]" if skipped else "") + "\n")
+                continue
+
+            elif choice == 3:
+                try:
                     text = console.input("[bold]Instruction:[/bold] ")
                 except EOFError:
                     continue
@@ -529,18 +594,27 @@ def _interactive_flow() -> None:
                     console.print("[dim]Skipped — empty input[/dim]\n")
                     continue
 
-                cat_options = list(CATEGORIES)
-                console.print()
-                cat_idx = _prompt_choice("Category?", cat_options)
+                auto_cat = _classify(text.strip())
+                console.print(f"[dim]Auto-detected category: {auto_cat}[/dim]")
                 try:
-                    inst = store.add(text.strip(), category=cat_options[cat_idx])
+                    raw = console.input(f"[bold]Category[/bold] [dim](enter to accept '{auto_cat}', or type one)[/dim]: ")
+                    chosen_cat = raw.strip() or auto_cat
+                except EOFError:
+                    chosen_cat = auto_cat
+
+                if chosen_cat not in CATEGORIES:
+                    console.print(f"[yellow]Unknown category '{chosen_cat}', using '{auto_cat}'[/yellow]")
+                    chosen_cat = auto_cat
+
+                try:
+                    inst = store.add(text.strip(), category=chosen_cat)
                     store.save(inst_path)
                     console.print(f"[green]Captured[/green] [{inst.category}] {inst.text}\n")
                 except ValueError as e:
                     console.print(f"[red]{e}[/red]\n")
                 continue
 
-            elif choice == 3:
+            elif choice == 4:
                 if not store.instructions:
                     console.print("[dim]No instructions captured yet.[/dim]\n")
                 else:
@@ -548,21 +622,47 @@ def _interactive_flow() -> None:
                     console.print()
                 continue
 
-            elif choice == 4:
+            elif choice == 5:
+                if not store.instructions:
+                    console.print("[dim]No instructions to remove.[/dim]\n")
+                    continue
+                _render_instructions_table(store)
+                try:
+                    raw = console.input("\n[bold]Remove # (or enter to cancel):[/bold] ")
+                except EOFError:
+                    continue
+                if not raw.strip():
+                    console.print("[dim]Cancelled[/dim]\n")
+                    continue
+                try:
+                    idx = int(raw.strip())
+                    removed = store.remove(idx)
+                    store.save(inst_path)
+                    console.print(f"[yellow]Removed[/yellow] [{removed.category}] {removed.text}\n")
+                except (ValueError, IndexError):
+                    console.print("[red]Invalid number[/red]\n")
+                continue
+
+            elif choice == 6:
                 _save_local_markdown(root, ctx, store)
                 continue
 
-            elif choice == 5:
+            elif choice == 7:
                 result = export_context(ctx, "claude", root, store)
                 console.print(f"[green]Saved[/green] → {result}\n")
                 continue
 
-            elif choice == 6:
+            elif choice == 8:
                 result = export_context(ctx, "cursor", root, store)
                 console.print(f"[green]Saved[/green] → {result}\n")
                 continue
 
-            elif choice == 7:
+            elif choice == 9:
+                result = export_context(ctx, "windsurf", root, store)
+                console.print(f"[green]Saved[/green] → {result}\n")
+                continue
+
+            elif choice == 10:
                 result = export_context(ctx, "prompt", root, store)
                 copied = _copy_to_clipboard(result.strip())
                 title = "System Prompt — copied to clipboard" if copied else "System Prompt — copy this"
@@ -570,7 +670,7 @@ def _interactive_flow() -> None:
                 console.print()
                 continue
 
-            elif choice == 8:
+            elif choice == 11:
                 try:
                     with console.status("Syncing to GitHub Gist…"):
                         gist_id = push(ctx, store)

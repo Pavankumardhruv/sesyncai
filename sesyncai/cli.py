@@ -55,6 +55,23 @@ def _inst_path(root: Path) -> Path:
     return root / CTX_DIR / INST_FILE
 
 
+def _copy_to_clipboard(text: str) -> bool:
+    import platform
+    import subprocess
+    try:
+        if platform.system() == "Darwin":
+            subprocess.run(["pbcopy"], input=text.encode(), check=True, timeout=5)
+        elif platform.system() == "Linux":
+            subprocess.run(["xclip", "-selection", "clipboard"], input=text.encode(), check=True, timeout=5)
+        elif platform.system() == "Windows":
+            subprocess.run(["clip"], input=text.encode(), check=True, timeout=5)
+        else:
+            return False
+        return True
+    except (FileNotFoundError, subprocess.SubprocessError):
+        return False
+
+
 def _require_init(root: Path) -> Path:
     ctx_path = _ctx_path(root)
     if not ctx_path.exists():
@@ -132,7 +149,9 @@ def export(
     result = export_context(ctx, fmt, root, store)
 
     if fmt == "prompt":
-        console.print(Panel(result.strip(), title="System Prompt", border_style="cyan"))
+        copied = _copy_to_clipboard(result.strip())
+        title = "System Prompt — copied to clipboard" if copied else "System Prompt"
+        console.print(Panel(result.strip(), title=title, border_style="cyan"))
     else:
         console.print(f"[green]Exported[/green] → {result}")
         if store.instructions:
@@ -187,6 +206,43 @@ def load(
         parts.append(f"  Rules:     {len(store.instructions)} instructions")
 
     console.print(Panel("\n".join(parts), title="sesyncai load", border_style="cyan"))
+
+
+@app.command()
+def status(
+    path: Optional[str] = typer.Argument(None, help="Project root"),
+):
+    """Show a summary of captured context and instructions."""
+    root = Path(path).resolve() if path else Path.cwd()
+    ctx_path = _ctx_path(root)
+
+    if not ctx_path.exists():
+        console.print("[dim]Not initialized.[/dim] Run `sesyncai init` or just `sesyncai`.")
+        return
+
+    ctx = ProjectContext.load(ctx_path)
+    store = InstructionStore.load(_inst_path(root))
+
+    lines = [
+        f"[bold]{ctx.name}[/bold]",
+        "",
+        f"  Language:     {ctx.language or '—'}",
+        f"  Framework:    {ctx.framework or '—'}",
+        f"  Dependencies: {len(ctx.dependencies)}",
+        f"  Instructions: {len(store.instructions)}",
+    ]
+
+    if ctx.gist_id:
+        lines.append(f"  Gist:         https://gist.github.com/{ctx.gist_id}")
+    if ctx.last_synced:
+        lines.append(f"  Last synced:  {ctx.last_synced[:10]}")
+
+    if store.instructions:
+        grouped = store.by_category()
+        breakdown = ", ".join(f"{len(v)} {k}" for k, v in sorted(grouped.items()))
+        lines.append(f"\n  [dim]{breakdown}[/dim]")
+
+    console.print(Panel("\n".join(lines), title="sesyncai status", border_style="cyan"))
 
 
 @app.command()
@@ -496,7 +552,9 @@ def _interactive_flow() -> None:
 
             elif choice == 7:
                 result = export_context(ctx, "prompt", root, store)
-                console.print(Panel(result.strip(), title="System Prompt — copy this", border_style="green"))
+                copied = _copy_to_clipboard(result.strip())
+                title = "System Prompt — copied to clipboard" if copied else "System Prompt — copy this"
+                console.print(Panel(result.strip(), title=title, border_style="green"))
                 console.print()
                 continue
 

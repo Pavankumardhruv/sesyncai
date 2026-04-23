@@ -135,6 +135,23 @@ def _join_continuation_lines(raw_lines: list[str]) -> list[str]:
     return merged
 
 
+NEGATION_HEADERS = {"never", "don't", "do not", "avoid", "forbidden", "prohibited"}
+
+
+def _is_negation_section(header: str) -> bool:
+    return any(word in header for word in NEGATION_HEADERS)
+
+
+def _negate_if_needed(text: str, section: str) -> str:
+    """Prepend 'Never' to rules under negation headers like '### Never'."""
+    if not _is_negation_section(section):
+        return text
+    lower = text.lower()
+    if any(lower.startswith(w) for w in ("never", "don't", "do not", "avoid", "must not")):
+        return text
+    return f"Never {text[0].lower()}{text[1:]}"
+
+
 def _extract_markdown(path: Path, source: str) -> list[Instruction]:
     instructions: list[Instruction] = []
     in_code_block = False
@@ -158,6 +175,7 @@ def _extract_markdown(path: Path, source: str) -> list[Instruction]:
 
         text = _extract_instruction(line)
         if text:
+            text = _negate_if_needed(text, section_context)
             category = _classify(text + " " + section_context)
             instructions.append(Instruction(
                 text=text,
@@ -226,6 +244,7 @@ def _extract_rule_file(path: Path, source: str) -> list[Instruction]:
 
     instructions: list[Instruction] = []
     in_code_block = False
+    section_context = ""
 
     for line in _join_continuation_lines(body.splitlines()):
         stripped = line.strip()
@@ -237,8 +256,13 @@ def _extract_rule_file(path: Path, source: str) -> list[Instruction]:
         if in_code_block:
             continue
 
+        if stripped.startswith("#"):
+            section_context = stripped.lstrip("#").strip().lower()
+            continue
+
         extracted = _extract_instruction(line)
         if extracted:
+            extracted = _negate_if_needed(extracted, section_context)
             if scope:
                 extracted = extracted + scope
             instructions.append(Instruction(

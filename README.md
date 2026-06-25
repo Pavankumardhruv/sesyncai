@@ -7,24 +7,7 @@
 
 **Your AI context, captured once, usable everywhere.**
 
-Every time you switch between Claude, Cursor, ChatGPT, Windsurf, or move to a new machine — you lose context. You re-explain your project, re-state your preferences, re-teach the same rules. sesyncai fixes that.
-
-It scans your codebase once, captures the developer instructions you've built up over time, and generates a portable context snapshot you can export to any AI tool or sync across machines.
-
----
-
-## The Problem
-
-You've spent hours training your AI coding assistant — "use functional components", "never mock the database", "we picked Riverpod over Bloc because...". Then you:
-
-- Switch from Claude to Cursor → **context lost**
-- Open the project on your laptop → **context lost**
-- Start a new AI session → **context lost**
-- Onboard a teammate → **they start from zero**
-
-sesyncai captures all of this once and makes it portable.
-
----
+Scans your codebase, captures developer instructions from AI context files (CLAUDE.md, .cursorrules, etc.), and exports a portable context snapshot to any AI tool. Switch between Claude, Cursor, Windsurf, or move to a new machine without losing your project context.
 
 ## Install
 
@@ -34,11 +17,9 @@ pip install sesyncai
 
 Requires Python 3.10 or higher.
 
----
-
 ## Quick Start
 
-Just run `sesyncai` in your project directory — no commands to memorize:
+Just run `sesyncai` in your project directory - no commands to memorize:
 
 ```bash
 cd your-project
@@ -49,7 +30,7 @@ You'll see an interactive menu:
 
 ```
 ┌──────────────────────────────────────────────────┐
-│ sesyncai — AI context capture & sync             │
+│ sesyncai - AI context capture & sync             │
 │                                                  │
 │ Project directory: /your-project                 │
 └──────────────────────────────────────────────────┘
@@ -72,8 +53,6 @@ What would you like to do?
 ```
 
 Pick a number. That's it.
-
----
 
 ## What It Does
 
@@ -107,11 +86,11 @@ The rules and preferences you build up while prompting AI get automatically extr
 
 **What it extracts:**
 
-sesyncai uses pattern matching to find imperative developer instructions — statements starting with words like *Always*, *Never*, *Don't*, *Must*, *Prefer*, *Avoid*, *Use*, *Keep*, *Ensure*, *Run*. It's smart about it:
+sesyncai uses pattern matching to find imperative developer instructions - statements starting with words like *Always*, *Never*, *Don't*, *Must*, *Prefer*, *Avoid*, *Use*, *Keep*, *Ensure*, *Run*. It's smart about it:
 
 - Skips code blocks (won't extract from fenced ` ``` ` sections)
 - Joins multi-line bullet points into complete instructions
-- Understands negation sections — rules under a `### Never` heading get automatically prefixed with "Never"
+- Understands negation sections - rules under a `### Never` heading get automatically prefixed with "Never"
 - Filters out noise (bare URLs, short fragments, code-only lines)
 - Auto-categorizes each instruction into one of 7 categories
 
@@ -146,7 +125,7 @@ One snapshot, multiple formats:
 | System prompt | `sesyncai export prompt` | Copied to clipboard + stdout |
 | Local markdown | Interactive menu → option 7 | `yourproject-context.md` |
 
-Each export format is optimized for its target tool — structured markdown for Claude, flat bullet points for Cursor/Windsurf, a dense paragraph for system prompts.
+Each export format is optimized for its target tool - structured markdown for Claude, flat bullet points for Cursor/Windsurf, a dense paragraph for system prompts.
 
 ### 4. Syncs across machines
 
@@ -162,8 +141,6 @@ sesyncai load <gist-id>
 
 Both your project context **and** all captured instructions are synced together. Requires the [GitHub CLI](https://cli.github.com/) authenticated: `gh auth login`.
 
----
-
 ## Usage
 
 ### Interactive mode (recommended)
@@ -172,7 +149,7 @@ Both your project context **and** all captured instructions are synced together.
 sesyncai
 ```
 
-This is the easiest way to use sesyncai. It walks you through everything with a numbered menu — scan, capture, export, sync. No commands to memorize.
+This is the easiest way to use sesyncai. It walks you through everything with a numbered menu - scan, capture, export, sync. No commands to memorize.
 
 ### Direct commands
 
@@ -222,12 +199,10 @@ sesyncai --version                 # show version
 | Python | `pyproject.toml`, `setup.py`, `requirements.txt` | FastAPI, Flask, Django, Typer |
 | JavaScript / TypeScript | `package.json` | Next.js, React, Vue, Express |
 | Flutter / Dart | `pubspec.yaml` | Flutter |
-| Rust | `Cargo.toml` | — |
-| Go | `go.mod` | — |
+| Rust | `Cargo.toml` | - |
+| Go | `go.mod` | - |
 
 sesyncai detects the language, framework, dependencies, build commands, and test commands from these files.
-
----
 
 ## How It Works
 
@@ -274,25 +249,19 @@ sesyncai load abc123def456
 sesyncai export cursor
 ```
 
----
-
 ## Storage
 
 Everything is stored in `.sesyncai/` inside your project:
 
-- **`context.yaml`** — project metadata (language, framework, dependencies, structure)
-- **`instructions.yaml`** — captured rules and preferences with categories
+- **`context.yaml`** - project metadata (language, framework, dependencies, structure)
+- **`instructions.yaml`** - captured rules and preferences with categories
 
 Both files are human-readable YAML. You can edit them directly, version them, or add `.sesyncai/` to your `.gitignore` to keep context local.
-
----
 
 ## Requirements
 
 - Python 3.10+
 - [GitHub CLI](https://cli.github.com/) (only needed for `sync` and `load` commands)
-
----
 
 ## License
 

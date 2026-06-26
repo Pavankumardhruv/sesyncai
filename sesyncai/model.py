@@ -1,4 +1,4 @@
-"""Context data model — the core schema that sesyncai captures and exports."""
+"""Context data model - the core schema that sesyncai captures and exports."""
 
 from __future__ import annotations
 

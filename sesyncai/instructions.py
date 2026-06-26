@@ -1,4 +1,4 @@
-"""Instruction store — persistent, categorized developer instructions."""
+"""Instruction store - persistent, categorized developer instructions."""
 
 from __future__ import annotations
 

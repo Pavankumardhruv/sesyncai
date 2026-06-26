@@ -1,4 +1,4 @@
-"""CLI entry point — sesyncai commands."""
+"""CLI entry point - sesyncai commands."""
 
 from __future__ import annotations
 
@@ -115,8 +115,8 @@ def init(
     console.print(Panel(
         f"[bold green]Context captured[/bold green] → {ctx_path.relative_to(root)}\n\n"
         f"  Name:      {ctx.name}\n"
-        f"  Language:   {ctx.language or '—'}\n"
-        f"  Framework:  {ctx.framework or '—'}\n"
+        f"  Language:   {ctx.language or '-'}\n"
+        f"  Framework:  {ctx.framework or '-'}\n"
         f"  Deps:       {len(ctx.dependencies)}",
         title="sesyncai init",
         border_style="cyan",
@@ -138,7 +138,7 @@ def show(
 
     store = InstructionStore.load(_inst_path(root))
     if store.instructions:
-        console.print(f"\n[dim]{len(store.instructions)} instructions captured[/dim] — run `sesyncai instructions` to view")
+        console.print(f"\n[dim]{len(store.instructions)} instructions captured[/dim] - run `sesyncai instructions` to view")
 
 
 @app.command()
@@ -162,7 +162,7 @@ def export(
 
     if fmt == "prompt":
         copied = _copy_to_clipboard(result.strip())
-        title = "System Prompt — copied to clipboard" if copied else "System Prompt"
+        title = "System Prompt - copied to clipboard" if copied else "System Prompt"
         console.print(Panel(result.strip(), title=title, border_style="cyan"))
     else:
         console.print(f"[green]Exported[/green] → {result}")
@@ -212,8 +212,8 @@ def load(
 
     parts = [f"[bold green]Loaded[/bold green] → .sesyncai/\n"]
     parts.append(f"  Name:      {ctx.name}")
-    parts.append(f"  Language:   {ctx.language or '—'}")
-    parts.append(f"  Framework:  {ctx.framework or '—'}")
+    parts.append(f"  Language:   {ctx.language or '-'}")
+    parts.append(f"  Framework:  {ctx.framework or '-'}")
     if store.instructions:
         parts.append(f"  Rules:     {len(store.instructions)} instructions")
 
@@ -238,8 +238,8 @@ def status(
     lines = [
         f"[bold]{ctx.name}[/bold]",
         "",
-        f"  Language:     {ctx.language or '—'}",
-        f"  Framework:    {ctx.framework or '—'}",
+        f"  Language:     {ctx.language or '-'}",
+        f"  Framework:    {ctx.framework or '-'}",
         f"  Dependencies: {len(ctx.dependencies)}",
         f"  Instructions: {len(store.instructions)}",
     ]
@@ -478,7 +478,7 @@ def _interactive_flow() -> None:
     root = Path.cwd()
 
     console.print(Panel(
-        "[bold]sesyncai[/bold] — AI context capture & sync\n\n"
+        "[bold]sesyncai[/bold] - AI context capture & sync\n\n"
         f"Project directory: [cyan]{root}[/cyan]",
         border_style="cyan",
     ))
@@ -490,7 +490,7 @@ def _interactive_flow() -> None:
     if has_context:
         ctx = ProjectContext.load(ctx_path)
         store = InstructionStore.load(inst_path)
-        console.print(f"[green]Context loaded[/green] — {ctx.name} ({ctx.language or 'unknown'}, {len(ctx.dependencies)} deps, {len(store.instructions)} instructions)\n")
+        console.print(f"[green]Context loaded[/green] - {ctx.name} ({ctx.language or 'unknown'}, {len(ctx.dependencies)} deps, {len(store.instructions)} instructions)\n")
     else:
         console.print("[yellow]No context yet.[/yellow] Let's set it up.\n")
 
@@ -532,8 +532,8 @@ def _interactive_flow() -> None:
                 console.print(Panel(
                     f"[bold green]Context captured[/bold green]\n\n"
                     f"  Name:      {ctx.name}\n"
-                    f"  Language:   {ctx.language or '—'}\n"
-                    f"  Framework:  {ctx.framework or '—'}\n"
+                    f"  Language:   {ctx.language or '-'}\n"
+                    f"  Framework:  {ctx.framework or '-'}\n"
                     f"  Deps:       {len(ctx.dependencies)}",
                     border_style="cyan",
                 ))
@@ -591,7 +591,7 @@ def _interactive_flow() -> None:
                 except EOFError:
                     continue
                 if not text.strip():
-                    console.print("[dim]Skipped — empty input[/dim]\n")
+                    console.print("[dim]Skipped - empty input[/dim]\n")
                     continue
 
                 auto_cat = _classify(text.strip())
@@ -665,7 +665,7 @@ def _interactive_flow() -> None:
             elif choice == 10:
                 result = export_context(ctx, "prompt", root, store)
                 copied = _copy_to_clipboard(result.strip())
-                title = "System Prompt — copied to clipboard" if copied else "System Prompt — copy this"
+                title = "System Prompt - copied to clipboard" if copied else "System Prompt - copy this"
                 console.print(Panel(result.strip(), title=title, border_style="green"))
                 console.print()
                 continue

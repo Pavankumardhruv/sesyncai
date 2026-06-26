@@ -283,12 +283,12 @@ def _scan_structure(root: Path, ctx: ProjectContext) -> None:
 def _scan_existing_context(root: Path, ctx: ProjectContext) -> None:
     claude_md = root / "CLAUDE.md"
     if claude_md.exists():
-        ctx.notes.append("Has CLAUDE.md — existing Claude Code context file")
+        ctx.notes.append("Has CLAUDE.md - existing Claude Code context file")
         ctx.files_of_interest.append("CLAUDE.md")
 
     cursorrules = root / ".cursorrules"
     if cursorrules.exists():
-        ctx.notes.append("Has .cursorrules — existing Cursor context file")
+        ctx.notes.append("Has .cursorrules - existing Cursor context file")
         ctx.files_of_interest.append(".cursorrules")
 
     makefile = root / "Makefile"

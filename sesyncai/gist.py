@@ -1,4 +1,4 @@
-"""GitHub Gist sync — push and pull context + instructions via gists."""
+"""GitHub Gist sync - push and pull context + instructions via gists."""
 
 from __future__ import annotations
 
@@ -44,7 +44,7 @@ def push(ctx: ProjectContext, store: Optional[InstructionStore] = None, descript
         )
 
     ctx.last_synced = datetime.now(timezone.utc).isoformat()
-    desc = description or f"sesyncai context — {ctx.name}"
+    desc = description or f"sesyncai context - {ctx.name}"
 
     files = {CONTEXT_FILENAME: {"content": ctx.to_yaml()}}
     if store and store.instructions:
